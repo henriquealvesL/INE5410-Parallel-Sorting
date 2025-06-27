@@ -4,6 +4,15 @@
 #include <pthread.h>
 #include <unistd.h>
 
+
+typedef struct {
+    unsigned int **dados;    // vetor de buckets
+    unsigned int *tamanho;   // vetor com tamanho de cada bucket
+    unsigned int inicio;     // índice inicial do bucket que a thread deve ordenar
+    unsigned int fim;        // índice final
+    unsigned int thread_id;  // ID da thread
+} thread_args_t;
+
 // Funcao de ordenacao fornecida. Não pode alterar.
 void bubble_sort(int *v, int tam){
     int i, j, temp, trocou;
@@ -25,6 +34,7 @@ void bubble_sort(int *v, int tam){
 // Funcao para imprimir um vetor. Não pode alterar.
 void imprime_vet(unsigned int *v, int tam) {
     int i;
+    printf("Vetor: ");
     for(i = 0; i < tam; i++)
         printf("%d ", v[i]);
     printf("\n");
@@ -48,6 +58,49 @@ int le_vet(char *nome_arquivo, unsigned int *v, int tam) {
     fclose(arquivo);
 
     return 1;
+}
+
+void *ordenar_buckets(void *arg) {
+    thread_args_t *args = (thread_args_t *)arg;
+
+    for (unsigned int i = args->inicio; i < args->fim; i++) {
+        printf("Thread %u processando tarefa %u\n", args->thread_id, i);
+        fflush(stdout);
+        bubble_sort((int *)args->dados[i], args->tamanho[i]); // Ordena o bucket i usando bubble sort
+    }
+
+    pthread_exit(NULL);
+}
+
+void create_threads(unsigned int **dados, unsigned int *tamanho, unsigned int ntasks, unsigned int nthreads) {
+    pthread_t threads[nthreads];
+    thread_args_t args[nthreads];
+
+    unsigned int buckets_por_thread = ntasks / nthreads; //Divide o número de tarefas para cada threads
+    unsigned int resto = ntasks % nthreads; // Calcula o resto da divisão para distribuir as tarefas restantes
+
+    unsigned int index = 0;
+    unsigned int thread_id = 0;
+    for (unsigned int i = 0; i < nthreads; i++) {
+        unsigned int inicio = index; // Índice inicial do bucket que a thread deve ordenar
+        unsigned int quantidade = buckets_por_thread + (i < resto ? 1 : 0); // Distribui o resto das tarefas entre as primeiras threads
+        unsigned int fim = inicio + quantidade; // Índice final do bucket que a thread deve ordenar
+
+        args[i].dados = dados; // Vetor de buckets
+        args[i].tamanho = tamanho; //Vetor com tamanho de cada bucket
+        args[i].inicio = inicio;
+        args[i].fim = fim; 
+        args[i].thread_id = thread_id; // ID da thread
+
+        pthread_create(&threads[i], NULL, ordenar_buckets, (void *)&args[i]);
+
+        thread_id++;
+        index = fim;
+    }
+
+    for (unsigned int i = 0; i < nthreads; i++) {
+        pthread_join(threads[i], NULL);
+    }
 }
 
 // Funcao principal de ordenacao. Deve ser implementada com base nas informacoes fornecidas no enunciado do trabalho.
@@ -97,6 +150,23 @@ int sort_paralelo(unsigned int *vetor, unsigned int tam, unsigned int ntasks, un
             }
         }
     }
+
+    create_threads(dados, tamanho, ntasks, nthreads); // cria as threads para ordenar os buckets
+
+    // Imprime os buckets com seus intervalos
+    for (unsigned int i = 0; i < ntasks; i++) {
+        printf("Bucket %u [%u, %u): ", i, minimo[i], maximo[i]);
+        for (unsigned int j = 0; j < tamanho[i]; j++) {
+            printf("%u ", dados[i][j]);
+        }
+        printf("(tamanho: %u)\n", tamanho[i]);
+    }
+
+    for (unsigned int i = 0; i < ntasks; i++) {
+        free(dados[i]);
+    }
+
+    return 0;
 }
 
 // Funcao principal do programa. Não pode alterar.
