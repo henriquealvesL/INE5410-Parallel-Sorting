@@ -162,6 +162,14 @@ int sort_paralelo(unsigned int *vetor, unsigned int tam, unsigned int ntasks, un
         printf("(tamanho: %u)\n", tamanho[i]);
     }
 
+     // Etapa 3: Concatenação dos buckets ordenados no vetor original
+    unsigned int pos = 0;
+    for (unsigned int i = 0; i < ntasks; i++) {
+        for (unsigned int j = 0; j < tamanho[i]; j++) {
+            vetor[pos++] = dados[i][j];
+        }
+    }
+    
     for (unsigned int i = 0; i < ntasks; i++) {
         free(dados[i]);
     }
